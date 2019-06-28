@@ -392,15 +392,52 @@ int choose_surface=1;
 
 void draw_full_surface() // draw the surface
 {
-  int i, j, N_theta=50, skip=10;
+  int i, j, N_theta=50, skip=5;
   GLfloat mdiff[4]={0.8,0.8,0.8,1.0};
   GLfloat mdiff_curvature[N/skip][4];
+  float curvature[N/skip];
+  float curvature_max = 0;
+  float curvature_min = 0;
   for(int i=0;i<N/skip;i++)
   {
-      for(int j=0;j<4;j++)
+      int coord = i*skip + skip;
+      float tmp_curvature = 0.0;
+      if(y[coord] > 0.00001)
+        tmp_curvature = -1/y[coord]; // curvature along the horizontal
+      float dy = (y[coord+1]-y[coord-1])/(x[coord+1]-x[coord-1]);
+      float dy0 = (y[coord]-y[coord-1])/(x[coord]-x[coord-1]);
+      float dy1 = (y[coord+1]-y[coord])/(x[coord+1]-x[coord]);
+      float ddy = (dy1-dy0)*2/(x[coord+1]-x[coord-1]);
+      tmp_curvature *= ddy;
+      tmp_curvature /= pow(1+ dy*dy, 1.5);
+      
+      curvature[i] = tmp_curvature;
+      if(i>10&&i+10<N/skip)//exclude the poles, where approximation is bad
       {
-          mdiff_curvature[i][j] = (GLfloat)rand()/RAND_MAX;
+          if(tmp_curvature<curvature_min)
+              curvature_min = tmp_curvature;
+          if(tmp_curvature>curvature_max)
+              curvature_max = tmp_curvature;          
       }
+
+  }
+  float curvature_norm = curvature_max;
+  if(curvature_norm<-curvature_min)
+      curvature_norm = -curvature_min;
+  for(int i=0;i<N/skip;i++)
+  {
+      mdiff_curvature[i][0] = 0.5;
+      mdiff_curvature[i][1] = 0.3;
+      mdiff_curvature[i][2] = 0.5; 
+      mdiff_curvature[i][3] = 1.0;  
+      if(curvature[i]>0) // in red
+        mdiff_curvature[i][0] += pow(curvature[i]/curvature_norm, 0.5);
+      if(curvature[i]<0) // in blue
+        mdiff_curvature[i][0] -= pow(-curvature[i]/curvature_norm, 0.5);  
+      mdiff_curvature[i][2] = 1-mdiff_curvature[i][0];
+/*      for(int j=0;j<3;j++)
+          mdiff_curvature[i][j] = (float)rand()/RAND_MAX;*/        
+
   }
   GLfloat memm[]={0.05,0.05,0.05,1.0};
   GLfloat shininess[]={200.0};
@@ -409,12 +446,13 @@ void draw_full_surface() // draw the surface
   {
     glBegin(GL_TRIANGLE_STRIP);
 
-      glMaterialfv(GL_FRONT,GL_EMISSION,memm);
-      glMaterialfv(GL_FRONT,GL_SHININESS,shininess);
-      
-      for (i=0; i<=N_theta; i++)
+    glMaterialfv(GL_FRONT,GL_EMISSION,memm);
+    glMaterialfv(GL_FRONT,GL_SHININESS,shininess);
+   // printf("%f %f %f\n", mdiff_curvature[j/skip -1][0], mdiff_curvature[j/skip -1][1], mdiff_curvature[j/skip -1][2]);    
+      for (i=0; i<=N_theta; i++) // y[j] storing radius, x[j] storing y coordinates
       {
         glMaterialfv(GL_FRONT,GL_DIFFUSE,mdiff_curvature[j/skip - 1]);
+
         make_vertex(i*2.0*M_PI/N_theta,j,1);
         glMaterialfv(GL_FRONT,GL_DIFFUSE,mdiff_curvature[j/skip]);
         make_vertex(i*2.0*M_PI/N_theta,j+skip,1);
